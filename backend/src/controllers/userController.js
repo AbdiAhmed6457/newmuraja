@@ -3,11 +3,24 @@ const prisma = require('../prismaClient');
 
 const updateProfile = async (req, res) => {
   const userId = req.user.id;
-  const { location, educationLevel, bio, phoneNumber, name } = req.body;
+  // Helper to convert "null"/"undefined" strings to actual null/undefined or empty string
+  const clean = (val) => {
+    if (val === 'null' || val === 'undefined') return null;
+    return val;
+  };
+
+  const location = clean(req.body.location);
+  const educationLevel = clean(req.body.educationLevel);
+  const bio = clean(req.body.bio);
+  const phoneNumber = clean(req.body.phoneNumber);
+  const name = clean(req.body.name);
+
   let photoUrl = req.body.photoUrl;
 
   if (req.file) {
     photoUrl = `http://localhost:3000/uploads/${req.file.filename}`;
+  } else if (photoUrl === 'null' || photoUrl === 'undefined') {
+    photoUrl = null;
   }
 
   try {
@@ -25,6 +38,7 @@ const updateProfile = async (req, res) => {
     });
     res.json(user);
   } catch (error) {
+    console.error('Update profile error:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -224,6 +238,7 @@ const getPublicUstazs = async (req, res) => {
         bio: true,
         location: true,
         educationLevel: true,
+        lastSeen: true,
         _count: {
           select: {
             ustazConnections: { where: { status: 'ACCEPTED' } },
