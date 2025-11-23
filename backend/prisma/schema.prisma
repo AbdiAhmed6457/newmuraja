@@ -1,0 +1,131 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   // STUDENT, USTAZ, ADMIN
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Profile fields
+  photoUrl       String?
+  location       String?
+  educationLevel String?
+  bio            String?
+  phoneNumber    String?
+
+  // Student specific
+  category      String?
+  lastSeen      DateTime @default(now())
+  
+  // Relations
+  studentConnections Connection[] @relation("StudentConnections")
+  ustazConnections   Connection[] @relation("UstazConnections")
+
+  tasks           Task[]      @relation("StudentTasks")
+  assignedTasks   Task[]      @relation("UstazTasks")
+  attendance      Attendance[] @relation("StudentAttendance")
+  markedAttendance Attendance[] @relation("UstazAttendance")
+  feedbacks       Feedback[]
+  complaints      Complaint[]
+  timeSlots       TimeSlot[]
+  
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+}
+
+model Connection {
+  id        Int      @id @default(autoincrement())
+  studentId Int
+  ustazId   Int
+  status    String   @default("PENDING") // PENDING, ACCEPTED, REJECTED
+  createdAt DateTime @default(now())
+  
+  student   User     @relation("StudentConnections", fields: [studentId], references: [id])
+  ustaz     User     @relation("UstazConnections", fields: [ustazId], references: [id])
+
+  @@unique([studentId, ustazId])
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  content   String?  // Optional if sending only a file
+  senderId  Int
+  receiverId Int
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  attachmentUrl  String?
+  attachmentType String? // IMAGE, FILE, etc.
+
+  sender    User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiver  User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+}
+
+model Task {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  studentId   Int
+  ustazId     Int
+  
+  student     User     @relation("StudentTasks", fields: [studentId], references: [id])
+  ustaz       User     @relation("UstazTasks", fields: [ustazId], references: [id])
+}
+
+model Attendance {
+  id        Int      @id @default(autoincrement())
+  date      DateTime
+  status    String   // PRESENT, ABSENT, LATE
+  remarks   String?
+  createdAt DateTime @default(now())
+  
+  studentId Int
+  ustazId   Int
+  
+  student   User     @relation("StudentAttendance", fields: [studentId], references: [id])
+  ustaz     User     @relation("UstazAttendance", fields: [ustazId], references: [id])
+}
+
+model TimeSlot {
+  id        Int      @id @default(autoincrement())
+  day       String
+  startTime String
+  endTime   String
+  isBooked  Boolean  @default(false)
+  
+  ustazId   Int
+  ustaz     User     @relation(fields: [ustazId], references: [id])
+}
+
+model Feedback {
+  id        Int      @id @default(autoincrement())
+  content   String
+  createdAt DateTime @default(now())
+  
+  studentId Int
+  student   User     @relation(fields: [studentId], references: [id])
+}
+
+model Complaint {
+  id        Int      @id @default(autoincrement())
+  content   String
+  status    String   @default("PENDING") // PENDING, RESOLVED
+  createdAt DateTime @default(now())
+  
+  studentId Int
+  student   User     @relation(fields: [studentId], references: [id])
+}
