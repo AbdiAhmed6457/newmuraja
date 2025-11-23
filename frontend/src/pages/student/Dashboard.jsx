@@ -1,41 +1,34 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { Link, useLocation } from 'react-router-dom';
 import axios from 'axios';
+import { useLocation } from 'react-router-dom';
 import ChatWindow from '../../components/ChatWindow';
+import { toast } from 'sonner';
 
 const StudentDashboard = () => {
-    const { user } = useAuth();
-    const location = useLocation();
     const [tasks, setTasks] = useState([]);
     const [attendance, setAttendance] = useState([]);
-    const [feedback, setFeedback] = useState('');
-    const [complaint, setComplaint] = useState('');
+    const [profile, setProfile] = useState(null);
     const [myUstazs, setMyUstazs] = useState([]);
     const [selectedUstaz, setSelectedUstaz] = useState(null);
+    const [showScheduleModal, setShowScheduleModal] = useState(false);
+    const [scheduleData, setScheduleData] = useState([]);
+    const [scheduleUstazName, setScheduleUstazName] = useState('');
+
+    const location = useLocation();
 
     useEffect(() => {
         fetchTasks();
         fetchAttendance();
+        fetchProfile();
         fetchMyUstazs();
     }, []);
 
     useEffect(() => {
         if (location.state?.openChat && myUstazs.length > 0) {
-            // Default to the first ustaz if chat is requested via navbar, 
-            // or we could show a list to pick from. For now, let's pick the first one.
+            // Default to first ustaz if specific one not requested, or handle logic to find specific
             setSelectedUstaz(myUstazs[0]);
         }
     }, [location.state, myUstazs]);
-
-    const fetchMyUstazs = async () => {
-        try {
-            const res = await axios.get('http://localhost:3000/api/users/my-ustazs');
-            setMyUstazs(res.data);
-        } catch (error) {
-            console.error('Error fetching ustazs:', error);
-        }
-    };
 
     const fetchTasks = async () => {
         try {
@@ -55,213 +48,170 @@ const StudentDashboard = () => {
         }
     };
 
-    const submitFeedback = async (e) => {
-        e.preventDefault();
+    const fetchProfile = async () => {
         try {
-            await axios.post('http://localhost:3000/api/student/feedback', { content: feedback });
-            alert('Feedback submitted!');
-            setFeedback('');
+            const res = await axios.get('http://localhost:3000/api/users/profile');
+            setProfile(res.data);
         } catch (error) {
-            console.error('Error submitting feedback:', error);
+            console.error('Error fetching profile:', error);
         }
     };
 
-    const submitComplaint = async (e) => {
-        e.preventDefault();
+    const fetchMyUstazs = async () => {
         try {
-            await axios.post('http://localhost:3000/api/student/complaint', { content: complaint });
-            alert('Complaint submitted!');
-            setComplaint('');
+            const res = await axios.get('http://localhost:3000/api/users/my-ustazs');
+            setMyUstazs(res.data);
         } catch (error) {
-            console.error('Error submitting complaint:', error);
+            console.error('Error fetching ustazs:', error);
         }
     };
-
-    const [showScheduleModal, setShowScheduleModal] = useState(false);
-    const [scheduleSlots, setScheduleSlots] = useState([]);
-    const [scheduleUstaz, setScheduleUstaz] = useState(null);
 
     const openScheduleModal = async (ustaz) => {
-        setScheduleUstaz(ustaz);
+        setScheduleUstazName(ustaz.name);
         try {
             const res = await axios.get(`http://localhost:3000/api/schedule?ustazId=${ustaz.id}`);
-            setScheduleSlots(res.data);
+            setScheduleData(res.data);
             setShowScheduleModal(true);
         } catch (error) {
             console.error('Error fetching schedule:', error);
-            alert('Failed to fetch schedule.');
+            toast.error('Failed to fetch schedule');
         }
     };
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            {/* Main Content */}
-            <main className="py-10 mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-gray-50 py-10">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center mb-8">
                     <h1 className="text-3xl font-bold text-gray-900">Student Dashboard</h1>
-                    <Link to="/find-ustaz" className="px-4 py-2 bg-blue-600 text-white rounded-full hover:bg-blue-700 flex items-center">
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                        Find New Ustaz
-                    </Link>
+                    {profile && (
+                        <div className="flex items-center space-x-4">
+                            <div className="text-right">
+                                <div className="text-sm font-medium text-gray-900">{profile.name}</div>
+                                <div className="text-xs text-gray-500">{profile.email}</div>
+                            </div>
+                            <div className="h-10 w-10 rounded-full bg-green-200 flex items-center justify-center text-green-700 font-bold overflow-hidden">
+                                {profile.photoUrl ? (
+                                    <img src={profile.photoUrl} alt="Profile" className="h-full w-full object-cover" />
+                                ) : (
+                                    profile.name.charAt(0)
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* My Ustazs Section */}
                 <div className="mb-8">
                     <h2 className="text-xl font-semibold text-gray-800 mb-4">My Ustazs</h2>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        {myUstazs.map(ustaz => (
-                            <div key={ustaz.id} className="bg-white p-4 rounded-lg shadow flex items-center justify-between">
-                                <div className="flex items-center">
-                                    <div className="relative">
-                                        <img
-                                            src={ustaz.photoUrl ? (ustaz.photoUrl.startsWith('http') ? ustaz.photoUrl : `http://localhost:3000${ustaz.photoUrl}`) : "https://via.placeholder.com/40"}
-                                            alt={ustaz.name}
-                                            className="w-12 h-12 rounded-full object-cover"
-                                        />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {myUstazs.length === 0 ? (
+                            <div className="col-span-full bg-white p-6 rounded-lg shadow text-center text-gray-500">
+                                You are not connected to any Ustaz yet. <br />
+                                <a href="/find-ustaz" className="text-blue-600 hover:underline">Find an Ustaz</a>
+                            </div>
+                        ) : (
+                            myUstazs.map((ustaz) => (
+                                <div key={ustaz.id} className="bg-white p-4 rounded-lg shadow flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="relative">
+                                            <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold overflow-hidden">
+                                                {ustaz.photoUrl ? (
+                                                    <img
+                                                        src={ustaz.photoUrl.startsWith('http') ? ustaz.photoUrl : `http://localhost:3000${ustaz.photoUrl}`}
+                                                        alt={ustaz.name}
+                                                        className="h-full w-full object-cover"
+                                                    />
+                                                ) : (
+                                                    ustaz.name.charAt(0)
+                                                )}
+                                            </div>
+                                            {ustaz.lastSeen && (
+                                                <div className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${new Date() - new Date(ustaz.lastSeen) < 5 * 60 * 1000 ? 'bg-green-500' : 'bg-gray-400'
+                                                    }`}></div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <div className="font-medium text-gray-900">{ustaz.name}</div>
+                                            <div className="text-xs text-gray-500">{ustaz.location || 'Online'}</div>
+                                        </div>
                                     </div>
-                                    <div className="ml-3">
-                                        <h3 className="font-medium text-gray-900">{ustaz.name}</h3>
-                                        <p className="text-xs text-gray-500">{ustaz.educationLevel}</p>
+                                    <div className="flex space-x-2">
+                                        <button
+                                            onClick={() => openScheduleModal(ustaz)}
+                                            className="p-2 text-gray-600 hover:bg-gray-100 rounded-full"
+                                            title="View Schedule"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                        </button>
+                                        <button
+                                            onClick={() => setSelectedUstaz(ustaz)}
+                                            className="relative p-2 text-blue-600 hover:bg-blue-50 rounded-full"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+                                            {ustaz.unreadCount > 0 && (
+                                                <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                                    {ustaz.unreadCount}
+                                                </span>
+                                            )}
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="flex space-x-2">
-                                    <button
-                                        onClick={() => openScheduleModal(ustaz)}
-                                        className="p-2 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-200"
-                                        title="View Schedule"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                    </button>
-                                    <button
-                                        onClick={() => setSelectedUstaz(ustaz)}
-                                        className="relative p-2 bg-green-100 text-green-600 rounded-full hover:bg-green-200"
-                                        title="Chat"
-                                    >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-                                        {ustaz.unreadCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                                                {ustaz.unreadCount}
-                                            </span>
-                                        )}
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                        {myUstazs.length === 0 && (
-                            <div className="col-span-full text-center py-8 bg-white rounded-lg border border-dashed border-gray-300">
-                                <p className="text-gray-500">You haven't connected with any Ustaz yet.</p>
-                                <Link to="/find-ustaz" className="text-green-600 font-medium hover:underline mt-2 inline-block">Find one now</Link>
-                            </div>
+                            ))
                         )}
                     </div>
                 </div>
 
-                {/* Stats Overview */}
-                <div className="grid grid-cols-1 gap-6 mb-8 sm:grid-cols-3">
-                    <div className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="px-4 py-5 sm:p-6">
-                            <dt className="text-sm font-medium text-gray-500 truncate">Tasks Completed</dt>
-                            <dd className="mt-1 text-3xl font-semibold text-gray-900">{tasks.filter(t => t.isCompleted).length}</dd>
-                        </div>
-                    </div>
-                    <div className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="px-4 py-5 sm:p-6">
-                            <dt className="text-sm font-medium text-gray-500 truncate">Attendance Rate</dt>
-                            <dd className="mt-1 text-3xl font-semibold text-gray-900">
-                                {attendance.length > 0
-                                    ? Math.round((attendance.filter(a => a.status === 'PRESENT').length / attendance.length) * 100)
-                                    : 0}%
-                            </dd>
-                        </div>
-                    </div>
-                    <div className="bg-white overflow-hidden shadow rounded-lg">
-                        <div className="px-4 py-5 sm:p-6">
-                            <dt className="text-sm font-medium text-gray-500 truncate">Current Streak</dt>
-                            <dd className="mt-1 text-3xl font-semibold text-gray-900">5 Days</dd>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Tasks Section */}
                     <div className="bg-white shadow rounded-lg p-6">
-                        <h2 className="text-lg font-medium text-gray-900 mb-4">My Tasks</h2>
-                        <ul className="divide-y divide-gray-200">
-                            {tasks.map((task) => (
-                                <li key={task.id} className="py-4">
-                                    <div className="flex items-center justify-between">
-                                        <p className={`text-sm font-medium ${task.isCompleted ? 'text-green-600 line-through' : 'text-gray-900'}`}>
-                                            {task.title}
-                                        </p>
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${task.isCompleted ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                            {task.isCompleted ? 'Done' : 'Pending'}
-                                        </span>
-                                    </div>
-                                </li>
-                            ))}
-                            {tasks.length === 0 && <p className="text-gray-500 text-sm">No tasks assigned.</p>}
-                        </ul>
+                        <h2 className="text-xl font-semibold text-gray-800 mb-4">My Tasks</h2>
+                        {tasks.length === 0 ? (
+                            <p className="text-gray-500">No tasks assigned yet.</p>
+                        ) : (
+                            <ul className="divide-y divide-gray-200">
+                                {tasks.map((task) => (
+                                    <li key={task.id} className="py-4">
+                                        <div className="flex justify-between">
+                                            <div>
+                                                <p className="text-sm font-medium text-gray-900">{task.title}</p>
+                                                <p className="text-sm text-gray-500">{task.description}</p>
+                                            </div>
+                                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${task.isCompleted ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                                                {task.isCompleted ? 'Completed' : 'Pending'}
+                                            </span>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </div>
 
                     {/* Attendance Section */}
                     <div className="bg-white shadow rounded-lg p-6">
-                        <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Attendance</h2>
-                        <ul className="divide-y divide-gray-200">
-                            {attendance.slice(0, 5).map((record) => (
-                                <li key={record.id} className="py-4">
-                                    <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold text-gray-800 mb-4">Recent Attendance</h2>
+                        {attendance.length === 0 ? (
+                            <p className="text-gray-500">No attendance records found.</p>
+                        ) : (
+                            <ul className="divide-y divide-gray-200">
+                                {attendance.slice(0, 5).map((record) => (
+                                    <li key={record.id} className="py-4 flex justify-between items-center">
                                         <div>
                                             <p className="text-sm font-medium text-gray-900">{new Date(record.date).toLocaleDateString()}</p>
-                                            <p className="text-xs text-gray-500">Marked by: {record.ustaz?.name || 'Unknown'}</p>
+                                            <p className="text-xs text-gray-500">Marked by: {record.ustaz?.name}</p>
                                         </div>
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${record.status === 'PRESENT' ? 'bg-green-100 text-green-800' :
-                                            record.status === 'ABSENT' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                                            }`}>
+                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                            ${record.status === 'PRESENT' ? 'bg-green-100 text-green-800' :
+                                                record.status === 'ABSENT' ? 'bg-red-100 text-red-800' :
+                                                    'bg-yellow-100 text-yellow-800'}`}>
                                             {record.status}
                                         </span>
-                                    </div>
-                                </li>
-                            ))}
-                            {attendance.length === 0 && <p className="text-gray-500 text-sm">No attendance records.</p>}
-                        </ul>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </div>
                 </div>
-
-                {/* Feedback & Complaints */}
-                <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
-                    <div className="bg-white shadow rounded-lg p-6">
-                        <h2 className="text-lg font-medium text-gray-900 mb-4">Submit Feedback</h2>
-                        <form onSubmit={submitFeedback}>
-                            <textarea
-                                className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-green-500 focus:border-green-500"
-                                rows="3"
-                                placeholder="Share your thoughts..."
-                                value={feedback}
-                                onChange={(e) => setFeedback(e.target.value)}
-                            ></textarea>
-                            <button type="submit" className="mt-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
-                                Submit
-                            </button>
-                        </form>
-                    </div>
-
-                    <div className="bg-white shadow rounded-lg p-6">
-                        <h2 className="text-lg font-medium text-gray-900 mb-4">Report an Issue</h2>
-                        <form onSubmit={submitComplaint}>
-                            <textarea
-                                className="w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-red-500 focus:border-red-500"
-                                rows="3"
-                                placeholder="Describe the issue..."
-                                value={complaint}
-                                onChange={(e) => setComplaint(e.target.value)}
-                            ></textarea>
-                            <button type="submit" className="mt-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
-                                Report
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            </main>
+            </div>
 
             {selectedUstaz && (
                 <ChatWindow otherUser={selectedUstaz} onClose={() => setSelectedUstaz(null)} />
@@ -270,32 +220,31 @@ const StudentDashboard = () => {
             {/* Schedule Modal */}
             {showScheduleModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                    <div className="bg-white rounded-lg p-6 w-96 shadow-xl max-h-[80vh] overflow-y-auto">
-                        <h2 className="text-lg font-bold mb-4">Schedule for {scheduleUstaz?.name}</h2>
-                        {scheduleSlots.length === 0 ? (
-                            <p className="text-gray-500">No available slots.</p>
-                        ) : (
-                            <ul className="divide-y divide-gray-200">
-                                {scheduleSlots.map(slot => (
-                                    <li key={slot.id} className="py-3 flex justify-between items-center">
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-900">{slot.day}</p>
-                                            <p className="text-xs text-gray-500">{slot.startTime} - {slot.endTime}</p>
-                                        </div>
-                                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${slot.isBooked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
-                                            {slot.isBooked ? 'Booked' : 'Available'}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                        <div className="mt-4 flex justify-end">
-                            <button
-                                onClick={() => setShowScheduleModal(false)}
-                                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-                            >
-                                Close
+                    <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl">
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-lg font-bold">Schedule for {scheduleUstazName}</h2>
+                            <button onClick={() => setShowScheduleModal(false)} className="text-gray-500 hover:text-gray-700">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
+                        </div>
+                        <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {scheduleData.length === 0 ? (
+                                <p className="text-gray-500 text-center">No slots available.</p>
+                            ) : (
+                                scheduleData.map((slot) => (
+                                    <div key={slot.id} className={`p-3 rounded border ${slot.isBooked ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                                        <div className="flex justify-between font-medium">
+                                            <span>{slot.day}</span>
+                                            <span className={`text-xs px-2 py-1 rounded ${slot.isBooked ? 'bg-red-200 text-red-800' : 'bg-green-200 text-green-800'}`}>
+                                                {slot.isBooked ? 'Booked' : 'Available'}
+                                            </span>
+                                        </div>
+                                        <div className="text-sm text-gray-600 mt-1">
+                                            {slot.startTime} - {slot.endTime}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>

@@ -18,6 +18,7 @@ model User {
 
   // Profile fields
   photoUrl       String?
+  previousPhotoUrl String?
   location       String?
   educationLevel String?
   bio            String?

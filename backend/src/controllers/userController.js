@@ -11,11 +11,40 @@ const updateProfile = async (req, res) => {
   }
 
   try {
+    // Get current user to save previous photo
+    const currentUser = await prisma.user.findUnique({ where: { id: userId } });
+    let previousPhotoUrl = currentUser.previousPhotoUrl;
+
+    if (photoUrl && photoUrl !== currentUser.photoUrl) {
+      previousPhotoUrl = currentUser.photoUrl;
+    }
+
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { photoUrl, location, educationLevel, bio, phoneNumber, name }
+      data: { photoUrl, previousPhotoUrl, location, educationLevel, bio, phoneNumber, name }
     });
     res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+const revertProfilePhoto = async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user.previousPhotoUrl) {
+      return res.status(400).json({ error: 'No previous photo to revert to' });
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        photoUrl: user.previousPhotoUrl,
+        previousPhotoUrl: user.photoUrl // Swap them so we can toggle back if needed
+      }
+    });
+    res.json(updatedUser);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -184,4 +213,36 @@ const getMyConnections = async (req, res) => {
   }
 }
 
-module.exports = { updateProfile, getProfile, getUstazList, requestUstaz, getPendingRequests, handleRequest, getMyStudents, getMyUstazs, getMyConnections };
+const getPublicUstazs = async (req, res) => {
+  try {
+    const ustazs = await prisma.user.findMany({
+      where: { role: 'USTAZ' },
+      select: {
+        id: true,
+        name: true,
+        photoUrl: true,
+        bio: true,
+        location: true,
+        educationLevel: true,
+        _count: {
+          select: {
+            ustazConnections: { where: { status: 'ACCEPTED' } },
+            timeSlots: { where: { isBooked: false } }
+          }
+        }
+      }
+    });
+
+    const formattedUstazs = ustazs.map(u => ({
+      ...u,
+      studentCount: u._count.ustazConnections,
+      freeSlots: u._count.timeSlots
+    }));
+
+    res.json(formattedUstazs);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+module.exports = { updateProfile, getProfile, getUstazList, requestUstaz, getPendingRequests, handleRequest, getMyStudents, getMyUstazs, getMyConnections, getPublicUstazs, revertProfilePhoto };
