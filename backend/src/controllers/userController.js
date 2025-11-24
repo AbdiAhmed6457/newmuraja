@@ -245,6 +245,11 @@ const getPublicUstazs = async (req, res) => {
             timeSlots: { where: { isBooked: false } }
           }
         }
+      },
+      orderBy: {
+        ustazConnections: {
+          _count: 'desc'
+        }
       }
     });
 
